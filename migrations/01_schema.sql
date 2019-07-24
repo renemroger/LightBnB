@@ -31,15 +31,15 @@ CREATE TABLE properties (
 
 CREATE TABLE reservations (
   id SERIAL PRIMARY KEY,
-  start_date date,
-  end_date date,
+  start_date VARCHAR(255),
+  end_date VARCHAR(255),
   property_id INTEGER REFERENCES properties(id),
   guest_id INTEGER REFERENCES users(id)
 );
 
 CREATE TABLE property_reviews(
   id SERIAL PRIMARY KEY,
-  resevation_Id INTEGER REFERENCES reservations(id),
+  reservation_id INTEGER REFERENCES reservations(id),
   property_id INTEGER REFERENCES properties(id),
   guest_id INTEGER REFERENCES users(id),
   rating VARCHAR(255),
