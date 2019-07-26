@@ -184,15 +184,17 @@ exports.getAllProperties = getAllProperties;
  */
 const addProperty = function(property) {
   return new Promise(function(resolve, reject) {
-
-  })
-    .then(res => {
-      resolve(null);
-    })
-
-  // const propertyId = Object.keys(properties).length + 1;
-  // property.id = propertyId;
-  // properties[propertyId] = property;
-  // return Promise.resolve(property);
+    pool.query(`INSERT INTO properties (title,description,thumbnail_photo_url,cover_photo_url,cost_per_night,parking_spaces,number_of_bathrooms,number_of_bedrooms,country,street,city,province,post_code,active,owner_id) VALUES(
+    $1,$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    RETURNING *;
+    `, [property.title, property.description, property.thumbnail_photo_url, property.cover_photo_url, property.cost_per_night, property.parking_spaces, property.number_of_bathrooms, property.number_of_bedrooms, property.country, property.street, property.city, 'BC', property.post_code, true, property.owner_id]
+    )
+      .then((res) => {
+        resolve(res.rows[0]);
+      }).catch(function(error) {
+        console.log(error)
+        reject(null);
+      })
+  });
 }
 exports.addProperty = addProperty;
