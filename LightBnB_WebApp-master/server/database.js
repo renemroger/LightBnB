@@ -3,7 +3,7 @@ const users = require('./json/users.json');
 const { Pool } = require('pg');
 /// Users
 
-
+let client;
 const pool = new Pool({
   user: 'vagrant',
   host: 'localhost',
@@ -11,9 +11,10 @@ const pool = new Pool({
   password: '123',
 });
 
-pool.connect(
+pool.connect((err, poolClient, release) => {
+  client = poolClient;
   console.log('connected to the db')
-)
+});
 /**
  * Get a single user from the database given their email.
  * @param {String} email The email of the user.
@@ -56,7 +57,6 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
 const addUser = function(user) {
-  console.log(user);
   return new Promise(function(resolve, reject) {
     pool.query(`INSERT INTO users (name,email,password) VALUES(
     $1,
@@ -81,7 +81,6 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  console.log('getALL');
   return new Promise(function(resolve, reject) {
     pool.query(`
       SELECT * FROM reservations
@@ -89,10 +88,8 @@ const getAllReservations = function(guest_id, limit = 10) {
       LIMIT $2;
   `, [guest_id, limit])
       .then((res) => {
-        console.log(res.rows);
         resolve(res.rows);
       }).catch(function(error) {
-        console.log(error);
         reject(null);
       })
   });
@@ -109,11 +106,72 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  return pool.query(`
-  SELECT * FROM properties
-  LIMIT $1
-  `, [limit])
-    .then(res => res.rows);
+  return new Promise(function(resolve, reject) {
+    const queryParams = [];
+    // 2
+    let queryArray = [];
+    let queryString = ''
+
+    queryString += `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  `;
+
+    if (options.city || options.minimum_price_per_night || options.maximum_price_per_night || options.minimum_rating) {
+      queryString += ' WHERE '
+    }
+
+    if (options.owner_id) {
+      queryParams.push(options.id);
+      queryArray.push(`owner_id LIKE $${queryParams[queryParams.length]}`);
+    }
+
+    // 3
+    if (options.city) {
+      queryParams.push(`%${options.city}%`);
+      queryArray.push(`city LIKE '${queryParams[queryParams.length - 1]}'`);
+    }
+    if (options.minimum_price_per_night && options.maximum_price_per_night) {
+      queryParams.push(options.minimum_price_per_night);
+      queryParams.push(options.maximum_price_per_night);
+      queryArray.push(` cost_per_night < ${queryParams[queryParams.length - 1]} AND cost_per_night > ${queryParams[queryParams.length - 2]}`)
+
+    } else {
+      if (options.minimum_price_per_night) {
+        queryParams.push(options.minimum_price_per_night);
+        queryArray.push(` cost_per_night > ${queryParams[queryParams.length - 1]}`)
+      }
+
+      if (options.maximum_price_per_night) {
+        queryParams.push(options.minimum_price_per_night);
+        queryArray.push(` cost_per_night < ${queryParams[queryParams.length - 1]}`)
+      }
+    }
+
+    queryString += queryArray.join(' AND ');
+
+    if (options.minimum_rating) {
+      queryParams.push(options.minimum_rating);
+      queryArray.push(` property_reviews.rating > ${queryParams[queryParams.length - 1]}`)
+    }
+
+    // 4
+    queryParams.push(limit);
+    queryString += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT ${queryParams.length};
+  `;
+    console.log(queryString);
+    client.query(queryString)
+      .then(res => {
+        console.log(res.rows);
+        resolve(res.rows);
+      }).catch(function(error) {
+        reject(null);
+      })
+  });
 }
 exports.getAllProperties = getAllProperties;
 
@@ -124,9 +182,16 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  return new Promise(function(resolve, reject) {
+
+  })
+    .then(res => {
+      resolve(null);
+    })
+
+  // const propertyId = Object.keys(properties).length + 1;
+  // property.id = propertyId;
+  // properties[propertyId] = property;
+  // return Promise.resolve(property);
 }
 exports.addProperty = addProperty;
